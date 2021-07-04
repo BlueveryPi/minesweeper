@@ -1,8 +1,10 @@
-import pygame
+import pygame, math, random
+import numpy as np
 pygame.init()
 
 size=6
-screen = pygame.display.set_mode([size*50+30+(size-1)*5, size*50+30+(size-1)*5])
+w=61 - int(math.log(size))*10
+screen = pygame.display.set_mode([size*w+30+(size-1)*5, size*w+30+(size-1)*5])
 gridlist=[]
 
 class mine():
@@ -11,7 +13,60 @@ class mine():
         self.y=0
         self.flagged=False
         self.mine=False
-        self.triggered=False
+        self.revealed=False
+        self.nearmines=0
+
+    def draw(self):
+        if self.revealed==True:
+            color=(220, 220, 220)
+        elif self.flagged==True:
+            color=(255, 26, 10)
+        elif self.mine==True:
+            color=(0,0,0)
+        else:
+            color=(33, 118, 255)
+        
+
+        pygame.draw.rect(screen, color, pygame.Rect(15+self.x*w+5*self.x, 15+self.y*w+5*self.y, w, w)) #draw the thingy
+        pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(18+self.x*w+5*self.x, 18+self.y*w+5*self.y, w-6, w-6))
+
+        if self.mine==True and self.revealed==True: #if boom
+            pygame.draw.rect(screen, (255, 26, 10), pygame.Rect(15+self.x*w+5*self.x, 15+self.y*w+5*self.y, w, w)) #color red
+
+    def onclick(self, event):
+        if event.pos[0]>15+5*self.x+w*self.x and event.pos[0]<15+5*self.x+w*(self.x+1) and event.pos[1]>15+5*self.y+w*self.y and event.pos[1]<15+5*self.y+w*(self.y+1):
+            if event.button==3:
+                self.flagged ^= True
+                print(self.nearmines)
+            elif event.button==1:
+                if self.mine == False:
+                    self.checkaround()
+                    self.revealed=True
+    
+    def checkaround(self, skip=-1):
+        tmp=[0, 1, 0, -1]
+        self.revealed=True
+        if skip==-1:
+            for _ in range(4):
+                try:
+                    if gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0:
+                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
+                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(4-_)
+                except IndexError:
+                    continue
+
+        else:
+            for _ in range(4):
+                try:
+                    if _==skip:
+                        break
+                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed==True:
+                        break
+                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0:
+                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
+                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(4-_)
+                except IndexError:
+                    continue
 
 for p in range(size):
     gridlist.append([])
@@ -20,7 +75,23 @@ for p in range(size):
     for q in range(size):
         gridlist[p].append(mine())
         gridlist[p][q].x=p
-        gridlist[p][q].x=q
+        gridlist[p][q].y=q
+
+for _ in range(int(size**2/4)):
+    a=random.randint(0, size-1)
+    b=random.randint(0, size-1)
+    gridlist[a][b].mine=True
+
+tmpx=[0, 1, 1, 1, 0, -1, -1, -1]
+tmpy=[-1, -1, 0, 1, 1, 1, 0, -1]
+for x in range(size):
+    for y in range(size):
+        try:
+            for _ in range(8):
+                if gridlist[x+tmpx[_]][y+tmpy[_]].mine:
+                    gridlist[x][y].nearmines += 1
+        except IndexError:
+            continue
 
 running = True
 while running:
@@ -29,24 +100,15 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.MOUSEBUTTONUP: 
-            if event.button==3: #if left click
-                if event.pos[0]>15 and event.pos[0]<size*50+30+(size-1)*5-15 and event.pos[1]>15 and event.pos[1]<size*50+30+(size-1)*5-15: #some nice over-safety
-                    gridlist[int((event.pos[0]-2.5)//56)][int((event.pos[1]-2.5)//56)].flagged ^= True #toggle the thingy
+            for x in range(size):
+                for y in range(size):
+                    gridlist[x][y].onclick(event)
 
     screen.fill((255, 255, 255))
 
     for x in range(size):
         for y in range(size):
-            if gridlist[x][y].flagged==False:
-                color=(33, 118, 255)
-            else:
-                color=(255, 26, 10)
-
-            pygame.draw.rect(screen, color, pygame.Rect(15+x*50+5*x, 15+y*50+5*y, 50, 50)) #draw the thingy
-            pygame.draw.rect(screen, (240, 240, 240), pygame.Rect(18+x*50+5*x, 18+y*50+5*y, 44, 44))
-
-            if gridlist[x][y].mine==True and gridlist[x][y].triggered==True: #if boom
-                pygame.draw.rect(screen, (255, 26, 10), pygame.Rect(18+x*50+5*x, 18+y*50+5*y, 44, 44)) #color red
+            gridlist[x][y].draw()
 
     pygame.display.flip()
 
