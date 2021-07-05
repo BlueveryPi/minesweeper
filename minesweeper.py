@@ -4,8 +4,19 @@ pygame.init()
 
 size=6
 w=61 - int(math.log(size))*10
+d=9 #out of 10
 screen = pygame.display.set_mode([size*w+30+(size-1)*5, size*w+30+(size-1)*5])
 gridlist=[]
+
+def translate(a):
+    if a==-1:
+        return 0
+    elif a==2:
+        return 1
+    elif a==1:
+        return 2
+    elif a==-2:
+        return 3
 
 class mine():
     def __init__(self):
@@ -45,26 +56,25 @@ class mine():
     
     def checkaround(self, skip=-1):
         tmp=[0, 1, 0, -1]
+        s=[-1, 2, 1, -2]
         self.revealed=True
         if skip==-1:
             for _ in range(4):
                 try:
                     if gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0:
                         gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
-                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(4-_)
+                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(3-_)
                 except IndexError:
                     continue
 
         else:
             for _ in range(4):
                 try:
-                    if _==skip:
+                    if _==skip or gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed==True:
                         break
-                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed==True:
-                        break
-                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0:
+                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0: #problem-ish
                         gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
-                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(4-_)
+                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(3-_)
                 except IndexError:
                     continue
 
@@ -78,20 +88,21 @@ for p in range(size):
         gridlist[p][q].y=q
 
 for _ in range(int(size**2/4)):
-    a=random.randint(0, size-1)
-    b=random.randint(0, size-1)
-    gridlist[a][b].mine=True
+    if random.randint(0, 10)<d:
+        a=random.randint(0, size-1)
+        b=random.randint(0, size-1)
+        gridlist[a][b].mine=True
 
 tmpx=[0, 1, 1, 1, 0, -1, -1, -1]
-tmpy=[-1, -1, 0, 1, 1, 1, 0, -1]
+tmpy=[-1, -1, 0, 1, 1, 1, 0, -1] #seems buggy, fix it
 for x in range(size):
     for y in range(size):
-        try:
-            for _ in range(8):
-                if gridlist[x+tmpx[_]][y+tmpy[_]].mine:
-                    gridlist[x][y].nearmines += 1
-        except IndexError:
-            continue
+            for _ in range(8):  
+                try:   
+                    if gridlist[x+tmpx[_]][y+tmpy[_]].mine:
+                        gridlist[x][y].nearmines += 1
+                except IndexError:
+                    continue
 
 running = True
 while running:
