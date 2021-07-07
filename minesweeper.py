@@ -53,30 +53,30 @@ class mine():
                 if self.mine == False:
                     self.checkaround()
                     self.revealed=True
+                else:
+                    pass #boom
     
-    def checkaround(self, skip=-1):
+    def checkaround(self, skip=0):
         tmp=[0, 1, 0, -1]
-        s=[-1, 2, 1, -2]
         self.revealed=True
-        if skip==-1:
+        if skip==0:
             for _ in range(4):
-                try:
-                    if gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0:
+                if self.x+tmp[_]>-1 and self.x+tmp[_]<size and self.y+tmp[3-_]>-1 and self.y+tmp[3-_]<size:
+                    if gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0 and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False:
                         gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
-                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(3-_)
-                except IndexError:
-                    continue
+                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(1)
+
+                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines!=0 and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False:
+                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
 
         else:
             for _ in range(4):
-                try:
-                    if _==skip or gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed==True:
-                        break
-                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0: #problem-ish
+                if self.x+tmp[_]>-1 and self.x+tmp[_]<size and self.y+tmp[3-_]>-1 and self.y+tmp[3-_]<size and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False:
+                    if gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed!=True and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0: #nightmare yesn't
                         gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
-                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(3-_)
-                except IndexError:
-                    continue
+                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(1)
+                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines!=0 and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False:
+                        gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
 
 for p in range(size):
     gridlist.append([])
@@ -94,14 +94,14 @@ for _ in range(int(size**2/4)):
         gridlist[a][b].mine=True
 
 tmpx=[0, 1, 1, 1, 0, -1, -1, -1]
-tmpy=[-1, -1, 0, 1, 1, 1, 0, -1] #seems buggy, fix it
+tmpy=[-1, -1, 0, 1, 1, 1, 0, -1] #no problem! no it wasn't. maybe? yes it is.
 for x in range(size):
     for y in range(size):
-            for _ in range(8):  
-                try:   
+            for _ in range(8):
+                if not(x+tmpx[_]<0 or x+tmpx[_]>size-1 or y+tmpy[_]<0 or y+tmpy[_]>size-1):
                     if gridlist[x+tmpx[_]][y+tmpy[_]].mine:
                         gridlist[x][y].nearmines += 1
-                except IndexError:
+                else:
                     continue
 
 running = True
