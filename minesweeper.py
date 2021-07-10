@@ -1,109 +1,144 @@
-import pygame, math, random
-import numpy as np
+import pygame, math, random, asyncio
+from PIL import Image, ImageDraw, ImageFont
 pygame.init()
 
-size=6
+size=10
 w=61 - int(math.log(size))*10
 d=9 #out of 10
 screen = pygame.display.set_mode([size*w+30+(size-1)*5, size*w+30+(size-1)*5])
 gridlist=[]
-
-def translate(a):
-    if a==-1:
-        return 0
-    elif a==2:
-        return 1
-    elif a==1:
-        return 2
-    elif a==-2:
-        return 3
+font=ImageFont.truetype("Rockout-vVaM.ttf", 30)
+minelist=[]
+remainingmines=0
 
 class mine():
-    def __init__(self):
+    def __init__(self, mx, my, board):
         self.x=0
         self.y=0
         self.flagged=False
         self.mine=False
         self.revealed=False
         self.nearmines=0
+        self.mx=mx
+        self.my=my
+        self.board=board
 
     def draw(self):
         if self.revealed==True:
             color=(220, 220, 220)
+            
         elif self.flagged==True:
             color=(255, 26, 10)
-        elif self.mine==True:
-            color=(0,0,0)
+
+        #elif self.mine==True:
+         #   color=(0, 0, 0) #debug mode
+
         else:
             color=(33, 118, 255)
         
 
-        pygame.draw.rect(screen, color, pygame.Rect(15+self.x*w+5*self.x, 15+self.y*w+5*self.y, w, w)) #draw the thingy
-        pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(18+self.x*w+5*self.x, 18+self.y*w+5*self.y, w-6, w-6))
+        pygame.draw.rect(screen, color, pygame.Rect(15+self.x*w+5*self.x+self.mx, 15+self.y*w+5*self.y+self.my, w, w)) #draw the thingy
+        pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(18+self.x*w+5*self.x+self.mx, 18+self.y*w+5*self.y+self.my, w-6, w-6))
 
         if self.mine==True and self.revealed==True: #if boom
-            pygame.draw.rect(screen, (255, 26, 10), pygame.Rect(15+self.x*w+5*self.x, 15+self.y*w+5*self.y, w, w)) #color red
+            self.board.ongame=False
+            pygame.draw.rect(screen, (255, 26, 10), pygame.Rect(15+self.x*w+5*self.x+self.mx, 15+self.y*w+5*self.y+self.my, w, w))
+            for i in range(0):
+                pass
+
+        elif self.revealed==True and self.nearmines!=0:
+            blank=Image.new("RGBA", (w-3, w-3), (220, 220, 220, 0))
+            ctx = ImageDraw.Draw(blank)
+            ctx.text((10,10), str(self.nearmines), font=font, fill=(33, 118, 255, 255))
+            screen.blit(pygame.image.fromstring(blank.tobytes(), blank.size, blank.mode), (self.x*w+15+5*self.x+int(w//4)+self.mx, self.y*w+15+5*self.y-int(w/6)+self.my+3))
 
     def onclick(self, event):
-        if event.pos[0]>15+5*self.x+w*self.x and event.pos[0]<15+5*self.x+w*(self.x+1) and event.pos[1]>15+5*self.y+w*self.y and event.pos[1]<15+5*self.y+w*(self.y+1):
+        if event.pos[0]>15+5*self.x+w*self.x+self.mx and event.pos[0]<15+5*self.x+w*(self.x+1)+self.mx and event.pos[1]>15+5*self.y+w*self.y+self.my and event.pos[1]<15+5*self.y+w*(self.y+1)+self.my:
             if event.button==3:
-                self.flagged ^= True
-                print(self.nearmines)
+                if self.revealed==False:
+                    self.flagged ^= True
+                    if self.mine==True and self.flagged==True:
+                        self.board.remainingmines-=1
+                        if self.board.remainingmines==0 and self.board.remaininggrids==0:
+                            self.board.ongame=False
+                            print('good')
+                            pass #endgame
+                        
+                    elif self.mine==True:
+                        self.board.remainingmines+=1
             elif event.button==1:
-                if self.mine == False:
+                if self.mine==False and self.revealed==False and self.flagged==False:
                     self.checkaround()
                     self.revealed=True
-                else:
-                    pass #boom
+                elif self.revealed==False and self.flagged==False:
+                    self.revealed=True
     
     def checkaround(self, skip=0):
         tmp=[0, 1, 0, -1]
         self.revealed=True
+        self.board.remaininggrids-=1
         if skip==0:
             for _ in range(4):
                 if self.x+tmp[_]>-1 and self.x+tmp[_]<size and self.y+tmp[3-_]>-1 and self.y+tmp[3-_]<size:
-                    if gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0 and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False:
+                    if gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0 and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].flagged==False:
                         gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
+                        self.board.remaininggrids-=1
                         gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(1)
 
-                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines!=0 and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False:
+                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines!=0 and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].flagged==False:
                         gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
+                        self.board.remaininggrids-=1
 
         else:
             for _ in range(4):
-                if self.x+tmp[_]>-1 and self.x+tmp[_]<size and self.y+tmp[3-_]>-1 and self.y+tmp[3-_]<size and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False:
+                if self.x+tmp[_]>-1 and self.x+tmp[_]<size and self.y+tmp[3-_]>-1 and self.y+tmp[3-_]<size and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].flagged==False:
                     if gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed!=True and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines==0: #nightmare yesn't
                         gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
+                        self.board.remaininggrids-=1
                         gridlist[self.x+tmp[_]][self.y+tmp[3-_]].checkaround(1)
-                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines!=0 and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False:
+                    elif gridlist[self.x+tmp[_]][self.y+tmp[3-_]].nearmines!=0 and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].mine==False and gridlist[self.x+tmp[_]][self.y+tmp[3-_]].flagged==False:
                         gridlist[self.x+tmp[_]][self.y+tmp[3-_]].revealed=True
+                        self.board.remaininggrids-=1
 
-for p in range(size):
-    gridlist.append([])
+class gameboard():
+    def __init__(self, x, y):
+        self.x=x
+        self.y=y
+        self.ongame=True
 
-for p in range(size):
-    for q in range(size):
-        gridlist[p].append(mine())
-        gridlist[p][q].x=p
-        gridlist[p][q].y=q
+    def initalize(self):
+        for p in range(size):
+            gridlist.append([])
 
-for _ in range(int(size**2/4)):
-    if random.randint(0, 10)<d:
-        a=random.randint(0, size-1)
-        b=random.randint(0, size-1)
-        gridlist[a][b].mine=True
+        for p in range(size):
+            for q in range(size):
+                gridlist[p].append(mine(self.x, self.y, self))
+                gridlist[p][q].x=p
+                gridlist[p][q].y=q
 
-tmpx=[0, 1, 1, 1, 0, -1, -1, -1]
-tmpy=[-1, -1, 0, 1, 1, 1, 0, -1] #no problem! no it wasn't. maybe? yes it is.
-for x in range(size):
-    for y in range(size):
-            for _ in range(8):
-                if not(x+tmpx[_]<0 or x+tmpx[_]>size-1 or y+tmpy[_]<0 or y+tmpy[_]>size-1):
-                    if gridlist[x+tmpx[_]][y+tmpy[_]].mine:
-                        gridlist[x][y].nearmines += 1
-                else:
-                    continue
+        for _ in range(int(size**2/4)):
+            if random.randint(0, 10)<d:
+                a=random.randint(0, size-1)
+                b=random.randint(0, size-1)
+                if gridlist[a][b].mine==False:
+                    gridlist[a][b].mine=True
+                    minelist.append(gridlist[a][b])
+        self.remainingmines=len(minelist)
+        self.remaininggrids=size**2-self.remainingmines
 
+        tmpx=[0, 1, 1, 1, 0, -1, -1, -1]
+        tmpy=[-1, -1, 0, 1, 1, 1, 0, -1] #no problem! no it wasn't. maybe? yes it is.
+        for x in range(size):
+            for y in range(size):
+                    for _ in range(8):
+                        if not(x+tmpx[_]<0 or x+tmpx[_]>size-1 or y+tmpy[_]<0 or y+tmpy[_]>size-1):
+                            if gridlist[x+tmpx[_]][y+tmpy[_]].mine:
+                                gridlist[x][y].nearmines += 1
+
+
+
+game1=gameboard(0, 0)
+game1.initalize()
 running = True
 while running:
 
