@@ -5,35 +5,28 @@ import threading
 
 def send(sock):
     while True:
-        sendData = input(">>> ")
-        if sendData != 'quit':
-            sock.send(sendData.encode("utf-8"))
+        sendData = input("")
+        if sendData != 'exit':
+            sock.send((nick+": "+sendData).encode("utf-8"))
         else:
             sock.close() 
 def recv(sock):
     while True:
         data = sock.recv(1024)
-        print("\n상대방:", data.decode("utf-8"))
-        print(">>> ")
+        print(data.decode("utf-8"))
 
-ip = "127.0.0.1"
+ip = str(input("IP: "))
 port = 65432
 
+nick=str(input("닉네임: "))
 clientSocket = socket(AF_INET, SOCK_STREAM)
-clientSocket1 = socket(AF_INET, SOCK_STREAM)
 clientSocket.connect( (ip, port))
-clientSocket1.connect( (ip, port+1))
+clientSocket.send(nick.encode('utf-8'))
 
 print("접속완료")
 
-sender = threading.Thread(target=send, args=(clientSocket,))
-sender = threading.Thread(target=send, args=(clientSocket1,))
+sender = threading.Thread(target=send, args=(clientSocket, ))
 receiver = threading.Thread(target=recv, args = (clientSocket,))
-receiver = threading.Thread(target=recv, args = (clientSocket1,))
 
 sender.start()
 receiver.start()
-
-'''
-초간단, 쓰레드를 이용한 채팅 클라이언트 
-'''
