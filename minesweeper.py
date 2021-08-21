@@ -1,27 +1,29 @@
-import pygame, math, random, asyncio
+import pygame, math, random, asyncio, pickle
 from PIL import Image, ImageDraw, ImageFont
+from socket import *
+import threading 
 pygame.init()
 
 size=10
 w=61 - int(math.log(size))*10
 d=9 #out of 10
-screen = pygame.display.set_mode([size*w+30+(size-1)*5, size*w+30+(size-1)*5])
-gridlist=[]
+screen = pygame.display.set_mode([(size*w+30+(size-1)*5)*2, size*w+30+(size-1)*5])
 font=ImageFont.truetype("Rockout-vVaM.ttf", 30)
-minelist=[]
-remainingmines=0
 
 class mine():
-    def __init__(self, mx, my, board):
+    def __init__(self, board, enabled):
         self.x=0
         self.y=0
         self.flagged=False
         self.mine=False
         self.revealed=False
         self.nearmines=0
-        self.mx=mx
-        self.my=my
+        self.mx=board.x
+        self.my=board.y
         self.board=board
+        self.enabled=enabled
+        self.gridlist=board.gridlist
+        self.minelist=board.minelist
 
     def draw(self):
         if self.revealed==True:
@@ -30,8 +32,8 @@ class mine():
         elif self.flagged==True:
             color=(255, 26, 10)
 
-        #elif self.mine==True:
-         #   color=(0, 0, 0) #debug mode
+        elif self.mine==True:
+            color=(0, 0, 0) #debug mode
 
         else:
             color=(33, 118, 255)
@@ -53,27 +55,29 @@ class mine():
             screen.blit(pygame.image.fromstring(blank.tobytes(), blank.size, blank.mode), (self.x*w+15+5*self.x+int(w//4)+self.mx, self.y*w+15+5*self.y-int(w/6)+self.my+3))
 
     def onclick(self, event):
-        if event.pos[0]>15+5*self.x+w*self.x+self.mx and event.pos[0]<15+5*self.x+w*(self.x+1)+self.mx and event.pos[1]>15+5*self.y+w*self.y+self.my and event.pos[1]<15+5*self.y+w*(self.y+1)+self.my:
-            if event.button==3:
-                if self.revealed==False:
-                    self.flagged ^= True
-                    if self.mine==True and self.flagged==True:
-                        self.board.remainingmines-=1
-                        if self.board.remainingmines==0 and self.board.remaininggrids==0:
-                            self.board.ongame=False
-                            print('good')
-                            pass #endgame
-                        
-                    elif self.mine==True:
-                        self.board.remainingmines+=1
-            elif event.button==1:
-                if self.mine==False and self.revealed==False and self.flagged==False:
-                    self.checkaround()
-                    self.revealed=True
-                elif self.revealed==False and self.flagged==False:
-                    self.revealed=True
+        if self.enabled:
+            if event.pos[0]>15+5*self.x+w*self.x+self.mx and event.pos[0]<15+5*self.x+w*(self.x+1)+self.mx and event.pos[1]>15+5*self.y+w*self.y+self.my and event.pos[1]<15+5*self.y+w*(self.y+1)+self.my:
+                if event.button==3:
+                    if self.revealed==False:
+                        self.flagged ^= True
+                        if self.mine==True and self.flagged==True:
+                            self.board.remainingmines-=1
+                            if self.board.remainingmines==0 and self.board.remaininggrids==0:
+                                self.board.ongame=False
+                                print('good')
+                                pass #endgame
+                            
+                        elif self.mine==True:
+                            self.board.remainingmines+=1
+                elif event.button==1:
+                    if self.mine==False and self.revealed==False and self.flagged==False:
+                        self.checkaround()
+                        self.revealed=True
+                    elif self.revealed==False and self.flagged==False:
+                        self.revealed=True
     
     def checkaround(self, skip=0):
+        gridlist=self.gridlist
         tmp=[0, 1, 0, -1]
         self.revealed=True
         self.board.remaininggrids-=1
@@ -101,18 +105,23 @@ class mine():
                         self.board.remaininggrids-=1
 
 class gameboard():
-    def __init__(self, x, y):
+    def __init__(self, x, y, enabled):
         self.x=x
         self.y=y
         self.ongame=True
+        self.enabled=enabled
+        self.gridlist=[]
+        self.minelist=[]
 
     def initalize(self):
+        gridlist=self.gridlist
+        minelist=self.minelist
         for p in range(size):
             gridlist.append([])
 
         for p in range(size):
             for q in range(size):
-                gridlist[p].append(mine(self.x, self.y, self))
+                gridlist[p].append(mine(self, self.enabled))
                 gridlist[p][q].x=p
                 gridlist[p][q].y=q
 
@@ -135,10 +144,45 @@ class gameboard():
                             if gridlist[x+tmpx[_]][y+tmpy[_]].mine:
                                 gridlist[x][y].nearmines += 1
 
+global updated
+updated=False
 
+def send(sock):
+    global updated
+    while True:
+        if updated==True:
+            updated=False
+            sendData = pickle.dumps(game1)
+            sock.send(nick.encode('utf-8'))
+            sock.send(sendData)
 
-game1=gameboard(0, 0)
+def recv(sock):
+    while True:
+        data1 = sock.recv(1024)
+        data = sock.recv(1024)
+        game2=pickle.loads(data)
+
+ip = str(input("IP: "))
+port = 65432
+
+nick=str(input("닉네임: "))
+clientSocket = socket(AF_INET, SOCK_STREAM)
+clientSocket.connect( (ip, port))
+clientSocket.send(nick.encode('utf-8'))
+
+print("접속완료")
+
+sender = threading.Thread(target=send, args=(clientSocket, ))
+receiver = threading.Thread(target=recv, args = (clientSocket,))
+
+sender.start()
+receiver.start()
+
+game1=gameboard(0, 0, True)
+game2=gameboard(size*w+30+(size-1)*5, 0, False)
 game1.initalize()
+game2.initalize()
+
 running = True
 while running:
 
@@ -148,13 +192,16 @@ while running:
         elif event.type == pygame.MOUSEBUTTONUP: 
             for x in range(size):
                 for y in range(size):
-                    gridlist[x][y].onclick(event)
+                    game1.gridlist[x][y].onclick(event)
+                    updated=True
+
 
     screen.fill((255, 255, 255))
 
     for x in range(size):
         for y in range(size):
-            gridlist[x][y].draw()
+            game1.gridlist[x][y].draw()
+            game2.gridlist[x][y].draw()
 
     pygame.display.flip()
 

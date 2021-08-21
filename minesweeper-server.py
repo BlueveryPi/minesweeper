@@ -5,34 +5,39 @@ import threading
 import platform
 
 connections=[]
+players=[]
+spectators=[]
 def acceptall():
     while True:
         connectionSocket, addr = serverSocket.accept()
+        if len(players)<3:
+            players.append(connectionSocket)
+        else:
+            spectators.append(connectionSocket)
         thisguysnick=connectionSocket.recv(1024)
         print(f"{thisguysnick.decode('utf-8')}님이 접속했습니다.")
         for sock in connections:
             if sock != connectionSocket:
                 sock.send((f"{thisguysnick.decode('utf-8')}님이 접속했습니다.").encode('utf-8'))
         connections.append(connectionSocket)
-        sender = threading.Thread(target=send, args=(connections, ))
-        receiver = threading.Thread(target=recv, args=(connectionSocket, connections, ))
+        sender = threading.Thread(target=send)
+        receiver = threading.Thread(target=recv, args=(connectionSocket, ))
         sender.start()
         receiver.start()
 
-def send(socks):
+def send():
     while True:
         sendData = input("")
         if sendData != "serveroff":
-            for sock in socks:
-                sock.send(("<System>: "+sendData).encode('utf-8'))
+            for sock in players:
+                sock.send()
         else:
             serverSocket.close() 
 
-def recv(sock, socks):
+def recv(sock):
     while True:
         data=sock.recv(1024)
-        print(data.decode('utf-8'))
-        for sock1 in socks:
+        for sock1 in connections:
             if sock1 != sock:
                 sock1.send(data)
 

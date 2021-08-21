@@ -30,3 +30,7 @@ receiver = threading.Thread(target=recv, args = (clientSocket,))
 
 sender.start()
 receiver.start()
+
+'''
+초간단, 쓰레드를 이용한 채팅 클라이언트 
+'''
