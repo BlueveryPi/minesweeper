@@ -153,13 +153,12 @@ def send(sock):
         if updated==True:
             updated=False
             sendData = pickle.dumps(game1)
-            sock.send(nick.encode('utf-8'))
             sock.send(sendData)
 
 def recv(sock):
+    global game2
     while True:
-        data1 = sock.recv(1024)
-        data = sock.recv(1024)
+        data = sock.recv(8192)
         game2=pickle.loads(data)
 
 ip = str(input("IP: "))
@@ -177,7 +176,7 @@ receiver = threading.Thread(target=recv, args = (clientSocket,))
 
 sender.start()
 receiver.start()
-
+global game2
 game1=gameboard(0, 0, True)
 game2=gameboard(size*w+30+(size-1)*5, 0, False)
 game1.initalize()
