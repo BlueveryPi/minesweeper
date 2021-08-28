@@ -15,10 +15,10 @@ def acceptall():
         else:
             spectators.append(connectionSocket)
         thisguysnick=connectionSocket.recv(1024)
-        print(f"{thisguysnick.decode('utf-8')}님이 접속했습니다.")
+        print(thisguysnick.decode('utf-8'))
         for sock in connections:
             if sock != connectionSocket:
-                sock.send((f"{thisguysnick.decode('utf-8')}님이 접속했습니다.").encode('utf-8'))
+                sock.send(thisguysnick)
         connections.append(connectionSocket)
         sender = threading.Thread(target=send)
         receiver = threading.Thread(target=recv, args=(connectionSocket, ))

@@ -2,6 +2,7 @@ import pygame, math, random, asyncio, pickle
 from PIL import Image, ImageDraw, ImageFont
 from socket import *
 import threading 
+import sys
 pygame.init()
 
 size=10
@@ -11,7 +12,7 @@ screen = pygame.display.set_mode([(size*w+30+(size-1)*5)*2, size*w+30+(size-1)*5
 font=ImageFont.truetype("Rockout-vVaM.ttf", 30)
 
 class mine():
-    def __init__(self, board, enabled):
+    def __init__(self, board):
         self.x=0
         self.y=0
         self.flagged=False
@@ -21,7 +22,15 @@ class mine():
         self.mx=board.x
         self.my=board.y
         self.board=board
-        self.enabled=enabled
+        self.enabled=board.enabled
+        self.gridlist=board.gridlist
+        self.minelist=board.minelist
+
+    def refresh(self, board):
+        self.mx=board.x
+        self.my=board.y
+        self.board=board
+        self.enabled=board.enabled
         self.gridlist=board.gridlist
         self.minelist=board.minelist
 
@@ -121,7 +130,7 @@ class gameboard():
 
         for p in range(size):
             for q in range(size):
-                gridlist[p].append(mine(self, self.enabled))
+                gridlist[p].append(mine(self))
                 gridlist[p][q].x=p
                 gridlist[p][q].y=q
 
@@ -152,14 +161,38 @@ def send(sock):
     while True:
         if updated==True:
             updated=False
-            sendData = pickle.dumps(game1)
+            sendData = pickle.dumps("hello")#[game1.gridlist, game1.minelist])
+            with open("testfile.bin", "wb") as f:
+                pickle.dump(game1, f)
+            print(sys.getsizeof(pickle.dumps(sendData)))
             sock.send(sendData)
 
 def recv(sock):
     global game2
     while True:
-        data = sock.recv(8192)
-        game2=pickle.loads(data)
+        data = sock.recv(8000)
+        try:
+            print(data.decode("utf-8"))
+        except UnicodeDecodeError:
+            print(pickle.loads(data, encoding="utf-8"))
+            game2.gridlist=pickle.loads(data)[0]
+            game2.minelist=pickle.loads(data)[1]
+            x=-1
+            for mine in game2.gridlist:
+                x+=1
+                y=-1
+                for m in mine:
+                    y+=1
+                    m.refresh(game2)
+                    game2.gridlist[x][y]=m
+            x=-1
+            for mine in game2.minelist:
+                x+=1
+                y=-1
+                for m in mine:
+                    y+=1
+                    m.refresh(game2)
+                    game2.minelist[x][y]=m
 
 ip = str(input("IP: "))
 port = 65432
@@ -167,7 +200,7 @@ port = 65432
 nick=str(input("닉네임: "))
 clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.connect( (ip, port))
-clientSocket.send(nick.encode('utf-8'))
+clientSocket.send((nick+"님이 접속하셨습니다.").encode('utf-8'))
 
 print("접속완료")
 
