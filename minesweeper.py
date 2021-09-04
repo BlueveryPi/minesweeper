@@ -2,7 +2,7 @@ import pygame, math, random, asyncio, pickle
 from PIL import Image, ImageDraw, ImageFont
 from socket import *
 import threading 
-import sys
+import json
 pygame.init()
 
 size=10
@@ -23,18 +23,25 @@ class mine():
         self.my=board.y
         self.board=board
         self.enabled=board.enabled
-        self.gridlist=board.gridlist
-        self.minelist=board.minelist
+
+    def toJson(self):
+        j={"x": self.x,
+        "y": self.y, 
+        "flagged": self.flagged,
+        "mine": self.mine,
+        "revealed": self.revealed,
+        "nearmines": self.nearmines}
+        return json.dumps(j)
 
     def refresh(self, board):
         self.mx=board.x
         self.my=board.y
         self.board=board
         self.enabled=board.enabled
-        self.gridlist=board.gridlist
-        self.minelist=board.minelist
 
     def draw(self):
+        self.mx=self.board.x
+        self.my=self.board.y
         if self.revealed==True:
             color=(220, 220, 220)
             
@@ -54,8 +61,6 @@ class mine():
         if self.mine==True and self.revealed==True: #if boom
             self.board.ongame=False
             pygame.draw.rect(screen, (255, 26, 10), pygame.Rect(15+self.x*w+5*self.x+self.mx, 15+self.y*w+5*self.y+self.my, w, w))
-            for i in range(0):
-                pass
 
         elif self.revealed==True and self.nearmines!=0:
             blank=Image.new("RGBA", (w-3, w-3), (220, 220, 220, 0))
@@ -86,7 +91,7 @@ class mine():
                         self.revealed=True
     
     def checkaround(self, skip=0):
-        gridlist=self.gridlist
+        gridlist=self.board.gridlist
         tmp=[0, 1, 0, -1]
         self.revealed=True
         self.board.remaininggrids-=1
@@ -161,11 +166,22 @@ def send(sock):
     while True:
         if updated==True:
             updated=False
-            sendData = pickle.dumps("hello")#[game1.gridlist, game1.minelist])
-            with open("testfile.bin", "wb") as f:
-                pickle.dump(game1, f)
-            print(sys.getsizeof(pickle.dumps(sendData)))
-            sock.send(sendData)
+            sendData=[]
+            a=[]
+            b=[]
+            x=-1
+            for m in game1.gridlist:
+                x+=1
+                y=-1
+                c=[]
+                for k in m:
+                    y+=1
+                    c.append(k.toJson())
+                a.append(c)
+            for m in game1.minelist:
+                b.append(m.toJson())
+            sendData=[a, b]
+            sock.send(json.dumps(sendData).encode("utf-8"))
 
 def recv(sock):
     global game2
@@ -174,30 +190,44 @@ def recv(sock):
         try:
             print(data.decode("utf-8"))
         except UnicodeDecodeError:
-            print(pickle.loads(data, encoding="utf-8"))
-            game2.gridlist=pickle.loads(data)[0]
-            game2.minelist=pickle.loads(data)[1]
+            gridlist=json.loads(data.decode("utf-8"))[0]
+            minelist=json.loads(data.decode("utf-8"))[1]
             x=-1
-            for mine in game2.gridlist:
+            for mine in gridlist:
                 x+=1
                 y=-1
                 for m in mine:
                     y+=1
-                    m.refresh(game2)
-                    game2.gridlist[x][y]=m
-            x=-1
-            for mine in game2.minelist:
-                x+=1
-                y=-1
-                for m in mine:
-                    y+=1
-                    m.refresh(game2)
-                    game2.minelist[x][y]=m
+                    k=mine(game2)
+                    k.x=gridlist[x][y]["x"]
+                    k.y=gridlist[x][y]["y"]
+                    k.flagged=gridlist[x][y]["flagged"]
+                    k.mine=gridlist[x][y]["mine"]
+                    k.revealed=gridlist[x][y]["revealed"]
+                    k.nearmines=gridlist[x][y]["nearmines"]
+                    gridlist[x][y]=k
+                    k.refresh(game2)
 
-ip = str(input("IP: "))
+            i=-1
+            for mine in minelist:
+                i+=1
+                k=mine(game2)
+                k.x=minelist[i]["x"]
+                k.y=minelist[i]["y"]
+                k.flagged=minelist[i]["flagged"]
+                k.mine=minelist[i]["mine"]
+                k.revealed=minelist[i]["revealed"]
+                k.nearmines=minelist[i]["nearmines"]
+                minelist[i]=k
+                k.refresh(game2)
+            game2.minelist=minelist
+            game2.gridlist=gridlist
+
+
+ip = "192.168.1.101"#str(input("IP: "))
 port = 65432
 
-nick=str(input("닉네임: "))
+nick=str("did")#input("닉네임: "))
 clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.connect( (ip, port))
 clientSocket.send((nick+"님이 접속하셨습니다.").encode('utf-8'))
@@ -209,7 +239,6 @@ receiver = threading.Thread(target=recv, args = (clientSocket,))
 
 sender.start()
 receiver.start()
-global game2
 game1=gameboard(0, 0, True)
 game2=gameboard(size*w+30+(size-1)*5, 0, False)
 game1.initalize()
