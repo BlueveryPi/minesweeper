@@ -1,4 +1,4 @@
-import pygame, math, random, asyncio, pickle
+import pygame, math, random, asyncio, pickle, gzip
 from PIL import Image, ImageDraw, ImageFont
 from socket import *
 import threading 
@@ -11,7 +11,7 @@ d=9 #out of 10
 screen = pygame.display.set_mode([(size*w+30+(size-1)*5)*2, size*w+30+(size-1)*5])
 font=ImageFont.truetype("Rockout-vVaM.ttf", 30)
 
-class mine():
+class Mine():
     def __init__(self, board):
         self.x=0
         self.y=0
@@ -31,7 +31,7 @@ class mine():
         "mine": self.mine,
         "revealed": self.revealed,
         "nearmines": self.nearmines}
-        return json.dumps(j)
+        return j
 
     def refresh(self, board):
         self.mx=board.x
@@ -78,8 +78,7 @@ class mine():
                             self.board.remainingmines-=1
                             if self.board.remainingmines==0 and self.board.remaininggrids==0:
                                 self.board.ongame=False
-                                print('good')
-                                pass #endgame
+                                endgame()
                             
                         elif self.mine==True:
                             self.board.remainingmines+=1
@@ -135,7 +134,7 @@ class gameboard():
 
         for p in range(size):
             for q in range(size):
-                gridlist[p].append(mine(self))
+                gridlist[p].append(Mine(self))
                 gridlist[p][q].x=p
                 gridlist[p][q].y=q
 
@@ -158,12 +157,22 @@ class gameboard():
                             if gridlist[x+tmpx[_]][y+tmpy[_]].mine:
                                 gridlist[x][y].nearmines += 1
 
+
+def gzip_str(string_: str) -> bytes:
+    return gzip.compress(string_.encode())
+
+
+def gunzip_bytes_obj(bytes_obj: bytes):
+    return gzip.decompress(bytes_obj)
+
+
 global updated
 updated=False
 
 def send(sock):
     global updated
     while True:
+        global sendData
         if updated==True:
             updated=False
             sendData=[]
@@ -181,24 +190,24 @@ def send(sock):
             for m in game1.minelist:
                 b.append(m.toJson())
             sendData=[a, b]
-            sock.send(json.dumps(sendData).encode("utf-8"))
+            dumped=json.dumps(sendData)
+            sock.sendall(gzip_str(dumped))
 
 def recv(sock):
     global game2
     while True:
-        data = sock.recv(8000)
         try:
-            print(data.decode("utf-8"))
-        except UnicodeDecodeError:
-            gridlist=json.loads(data.decode("utf-8"))[0]
-            minelist=json.loads(data.decode("utf-8"))[1]
+            data = gunzip_bytes_obj(sock.recv(800000))
+            dumped=data.decode()
+            gridlist=json.loads(data.decode("utf-8").replace("\\", ""))[0]
+            minelist=json.loads(data.decode("utf-8").replace("\\", ""))[1]
             x=-1
-            for mine in gridlist:
+            for mines in gridlist:
                 x+=1
                 y=-1
-                for m in mine:
+                for m in mines:
                     y+=1
-                    k=mine(game2)
+                    k=Mine(game2)
                     k.x=gridlist[x][y]["x"]
                     k.y=gridlist[x][y]["y"]
                     k.flagged=gridlist[x][y]["flagged"]
@@ -211,7 +220,7 @@ def recv(sock):
             i=-1
             for mine in minelist:
                 i+=1
-                k=mine(game2)
+                k=Mine(game2)
                 k.x=minelist[i]["x"]
                 k.y=minelist[i]["y"]
                 k.flagged=minelist[i]["flagged"]
@@ -222,9 +231,24 @@ def recv(sock):
                 k.refresh(game2)
             game2.minelist=minelist
             game2.gridlist=gridlist
+            
+        except gzip.BadGzipFile:
+            data = sock.recv(800000).decode()
+            if data!="hey im done! this is the proof! haha there is no way somebody would know this message! uh, dunno. might be. well, guess never gonna give you up~ nevergonna let you down~":
+                print(data.decode())
+            else:
+                endscreen()
 
 
-ip = "192.168.1.101"#str(input("IP: "))
+def endgame():
+    clientSocket.send("hey im done! this is the proof! haha there is no way somebody would know this message! uh, dunno. might be. well, guess never gonna give you up~ nevergonna let you down~".endcode())
+
+
+def endscreen():
+    pygame.draw.rect(screen, (0, 0, 0, 50), pygame.Rect((0, 0), (size*w+30+(size-1)*5)*2, size*w+30+(size-1)*5))
+
+
+ip = "127.0.0.1"#str(input("IP: "))
 port = 65432
 
 nick=str("did")#input("닉네임: "))

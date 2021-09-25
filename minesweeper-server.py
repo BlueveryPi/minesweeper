@@ -42,7 +42,7 @@ def recv(sock):
                 sock1.send(data)
 
 
-host = platform.uname()[1]
+host = "127.0.0.1"#platform.uname()[1]
 port = 65432
 
 serverSocket = socket(AF_INET, SOCK_STREAM)
